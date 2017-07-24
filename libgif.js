@@ -282,6 +282,17 @@
                     block.terminator = st.readByte();
                     handler.app && handler.app.NETSCAPE && handler.app.NETSCAPE(block);
                 };
+                var parseTalkrExt = function (block) {
+                    var blockSize = st.readByte(); 
+                    block.frameIndex = st.readUnsigned(); 
+                    block.numframes = st.readUnsigned(); 
+                    block.channelIdentifier = st.read(1);
+                    block.reserved1 = st.readByte();
+                    block.reserved2 = st.readByte();
+                    block.reserved3 = st.readByte();
+                    block.terminator = st.readByte();
+                    handler.app && handler.app.TALKR && handler.app.TALKR(block);
+                };                
 
                 var parseUnknownAppExt = function (block) {
                     block.appData = readSubBlocks();
@@ -296,6 +307,9 @@
                     case 'NETSCAPE':
                         parseNetscapeExt(block);
                         break;
+                    case 'TALKRAPP':
+                        parseTalkrExt(block);
+                        break;                        
                     default:
                         parseUnknownAppExt(block);
                         break;
@@ -446,9 +460,32 @@
         var lastDisposalMethod = null;
         var frame = null;
         var lastImg = null;
-
         var playing = true;
         var forward = true;
+        var defaultFrameTime = 10;
+
+
+        // Variables for play_for_duration
+        var totalLipsyncAnimTime = 0;
+        var playDuration = 0;
+        var startTime = 0;
+        var pingpong = false;
+
+        // We start to looping back at this frame,
+        //leaving any animation data after it available for 
+        // eyebrow-raises, blinks, or other
+        var last_lipsync_frame = 0;
+        var blink_anim = [22,24,23,22];  // Todo: remove hard coded
+        var eyebrow_anim = [25,26,27,27,27,28,28,28,28,26,26,25];// Todo: remove hard coded
+
+        var blink_index = 0;
+        var eyebrow_index = 0;
+        var num_blink_frames = 0;
+        var num_eyebrow_frames = 0;
+
+        // when these are > -1 they tick to the end and back
+        var blink_anim_index = -1;
+        var eyebrow_anim_index = -1;
 
         var ctx_scaled = false;
 
@@ -495,6 +532,8 @@
         var setSizes = function(w, h) {
             canvas.width = w * get_canvas_scale();
             canvas.height = h * get_canvas_scale();
+            canvas.style.zIndex  = 1;
+
             toolbar.style.minWidth = ( w * get_canvas_scale() ) + 'px';
 
             tmpCanvas.width = w;
@@ -502,6 +541,46 @@
             tmpCanvas.style.width = w + 'px';
             tmpCanvas.style.height = h + 'px';
             tmpCanvas.getContext('2d').setTransform(1, 0, 0, 1, 0, 0);
+
+            eyebrowCanvas.width = w;
+            eyebrowCanvas.height = h;
+            eyebrowCanvas.style.zIndex = 3;
+            eyebrowCanvas.getContext('2d').setTransform(1, 0, 0, 1, 0, 0);      
+
+            blinkCanvas.width = w;
+            blinkCanvas.height = h;
+            blinkCanvas.style.zIndex = 2;
+            blinkCanvas.getContext('2d').setTransform(1, 0, 0, 1, 0, 0);  
+
+
+            // make all canvas elements absolute relative to the parent div.
+            // We want them to overlap and act like the single img div that the
+            // parent div is going to replace            
+            canvas.style.position = "absolute" 
+            eyebrowCanvas.style.position = "absolute"
+            blinkCanvas.style.position = "absolute"
+
+            // Do our best to apply css that will make the canvas elements behave
+            // like the replaced img div.  Works with and without <center>
+            canvas.style.left = 0;
+            eyebrowCanvas.style.left = 0;
+            blinkCanvas.style.left = 0;
+            canvas.style.right = 0;
+            eyebrowCanvas.style.right = 0;
+            blinkCanvas.style.right = 0;  
+
+            canvas.style.margin = "0 auto";
+            eyebrowCanvas.style.margin = "0 auto";
+            blinkCanvas.style.margin = "0 auto";
+
+            // Add a classname to the canvases for the cases where the css above
+            // doesn't work (like when you are trying to get make the gif have 100% width
+            // TODO: find a better way to make our collection of div and canvas elements
+            // work like the img they are replacing.
+            canvas.className += "mainCanvas superGifCanvas"
+            eyebrowCanvas.className += "eyebrowCanvas superGifCanvas"
+            blinkCanvas.className += "blinkCanvas superGifCanvas"
+
         };
 
         var setFrameOffset = function(frame, offset) {
@@ -606,6 +685,13 @@
                             delay: delay
                         });
             frameOffsets.push({ x: 0, y: 0 });
+
+            var delayTime = delay == 0 ? defaultFrameTime : delay;
+            // Count the total animation time for all lip-sync frames
+            // so we can estimate when to reverse ticking direction
+            if((frames.length <= blink_index || blink_index == 0 ) && ( frames.length <= eyebrow_index || eyebrow_index == 0)){
+                totalLipsyncAnimTime = totalLipsyncAnimTime + delayTime * 10;
+            }            
         };
 
         var doImg = function (img) {
@@ -635,13 +721,23 @@
             */
             if (currIdx > 0) {
                 if (lastDisposalMethod === 3) {
+
+                    var bPreserveTalkrTransparency = false;
+                    if( currIdx >= blink_index && currIdx < blink_index + num_blink_frames){
+                        // we are on a blink frame.  We need to keep the transparency.
+                        bPreserveTalkrTransparency = true;
+                    }
+                    if( currIdx >= eyebrow_index && currIdx < eyebrow_index + num_eyebrow_frames){
+                        // we are on an eyebrow frame.  We need to keep the transparency.
+                        bPreserveTalkrTransparency = true;
+                    }
                     // Restore to previous
                     // If we disposed every frame including first frame up to this point, then we have
                     // no composited frame to restore to. In this case, restore to background instead.
-                    if (disposalRestoreFromIdx !== null) {
-                    	frame.putImageData(frames[disposalRestoreFromIdx].data, 0, 0);
+                    if (disposalRestoreFromIdx !== null && !bPreserveTalkrTransparency) {
+                        frame.putImageData(frames[disposalRestoreFromIdx].data, 0, 0);
                     } else {
-                    	frame.clearRect(lastImg.leftPos, lastImg.topPos, lastImg.width, lastImg.height);
+                        frame.clearRect(lastImg.leftPos, lastImg.topPos, lastImg.width, lastImg.height);
                     }
                 } else {
                     disposalRestoreFromIdx = currIdx - 1;
@@ -730,9 +826,9 @@
                     stepping = playing;
                     if (!stepping) return;
 
-                    stepFrame(1);
+                    stepFrame(forward ? 1 : -1); // Forward is only false with pingpong                    
                     var delay = frames[i].delay * 10;
-                    if (!delay) delay = 100; // FIXME: Should this even default at all? What should it be?
+                    if (!delay) delay = defaultFrameTime * 10; // FIXME: Should this even default at all? What should it be?
 
                     var nextFrameNo = getNextFrameNo();
                     if (nextFrameNo === 0) {
@@ -748,9 +844,104 @@
                 };
             }());
 
-            var putFrame = function () {
+            // assumes max >= index >= min,
+            // max > min 
+            var tickBlinksAndEyebrows = function(){
+
+                if(blink_anim_index >= 0){
+                    if( blink_anim_index >= blink_anim.length ){
+                        alert("Blink index issue: blink_anim_index >= blink_anim.length")
+                    } else {
+                        var frame_i = blink_anim[blink_anim_index]
+                        if( frames.length <= frame_i ) {
+                            console.log("frames.length:" + frames.length + "   frame_i: " + frame_i)
+                            alert("Blink index issue: frames.length > frame_i");
+                        } else{
+                            //console.log("adding blink to canvas: "+ frame_i)
+                            var offset = frameOffsets[frame_i];
+                            blinkCanvas.getContext("2d").putImageData(frames[frame_i].data, offset.x, offset.y);
+                        }
+                    }
+                    blink_anim_index += 1;
+                    if( blink_anim_index >=  blink_anim.length ){
+                        blink_anim_index = -1;
+                        blinkCanvas.getContext("2d").clearRect(0,0,blinkCanvas.width, blinkCanvas.height);
+                    }
+                    else
+                    {
+                        blinkCanvas.getContext("2d").drawImage(blinkCanvas, 0, 0);
+                    }                    
+                }
+
+                eyebrowCanvas.getContext("2d").clearRect(0,0,eyebrowCanvas.width, eyebrowCanvas.height);
+                if(eyebrow_anim_index >= 0){
+                    if( eyebrow_anim_index >= eyebrow_anim.length ){
+                        console.log("eyebrow_anim_index:" + eyebrow_anim_index + "    eyebrow_anim.length: " +  eyebrow_anim.length)
+                        alert("Eyebrow index issue: eyebrow_anim_index >= eyebrow_anim.length")
+                    } else {
+                        var frame_i = eyebrow_anim[eyebrow_anim_index]
+                        if( frames.length <= frame_i ) {
+                            console.log("frames.length:" + frames.length + "   frame_i: " + frame_i)
+                            alert("Eyebrow index issue: frames.length > frame_i");
+                        } else{
+                            //console.log("adding Eyebrow to canvas: "+ frame_i)
+                            var offset = frameOffsets[frame_i];
+                            eyebrowCanvas.getContext("2d").putImageData(frames[frame_i].data, offset.x, offset.y);
+                        }
+                    }
+                    
+                    eyebrow_anim_index += 1;
+                    if( eyebrow_anim_index >=  eyebrow_anim.length ){
+                        eyebrow_anim_index = -1;
+                        eyebrowCanvas.getContext("2d").clearRect(0,0,eyebrowCanvas.width, eyebrowCanvas.height);
+                    }
+                    else
+                    {
+                        //eyebrowCanvas.getContext("2d").drawImage(eyebrowCanvas, 0, 0);
+                        eyebrowCanvas.getContext("2d").drawImage(eyebrowCanvas, 0, 0);
+                    }
+
+                }   
+            }
+            var setFrameIndexAndDirection = function() {
+                // if ping-ponging, these are equivalent
+                i = Math.abs(i);
+
+                var num_lip_frames = Math.min(frames.length, last_lipsync_frame )
+
+                var timeElapsed = Date.now() - startTime;
+                var timeLeft = playDuration - timeElapsed;
+
+                var perFrameTime = totalLipsyncAnimTime / num_lip_frames;
+                if (forward) {
+                    if (perFrameTime * (i + 1) > timeLeft) {
+                        forward = false;
+                    }
+                }
+                if (timeLeft < 0) {
+                    i = 0;
+                    eyebrow_anim_index = -1;
+                    blink_anim_index = -1;
+                    eyebrowCanvas.getContext("2d").clearRect(0,0,eyebrowCanvas.width, eyebrowCanvas.height);
+                    blinkCanvas.getContext("2d").clearRect(0,0,blinkCanvas.width, blinkCanvas.height);
+                    pause();
+                }
+
+                if (i >= num_lip_frames){
+                    i = num_lip_frames - 1; // we'll play the last frame twice, but -2 could be more than frame.length
+                    forward = false;
+                } else if (i == 0) {
+                    forward = true;
+                } 
+            }
+
+            var putFrame = function() {
                 var offset;
                 i = parseInt(i, 10);
+
+                if (pingpong) {
+                    setFrameIndexAndDirection();
+                }
 
                 if (i > frames.length - 1){
                     i = 0;
@@ -765,14 +956,66 @@
                 tmpCanvas.getContext("2d").putImageData(frames[i].data, offset.x, offset.y);
                 ctx.globalCompositeOperation = "copy";
                 ctx.drawImage(tmpCanvas, 0, 0);
+
+                if( num_blink_frames > 0 || num_eyebrow_frames > 0 ){
+                    tickBlinksAndEyebrows();
+                }
             };
 
             var play = function () {
+                pingpong = false;
                 playing = true;
                 step();
             };
 
-            var pause = function () {
+            var trigger_randomized_blink = function(){
+                random = Math.random();
+
+                // Don't do it all the time
+                if( random < 0.6) return;
+
+                var timeElapsed = Date.now() - startTime;
+                var timeLeft = playDuration - timeElapsed;
+
+                if( random > 0.85 ){
+                    blink_anim_index = 0;
+                    eyebrow_anim_index = 0;
+                    //console.log("eyebrow raise and blink with time remaining: " + timeLeft + " elapsed: " + timeElapsed)
+                }
+                else if( random > 0.7 ){
+                    blink_anim_index = 0;
+                    //console.log("blink with time remaining: " + timeLeft+ " elapsed: " + timeElapsed)
+                }
+                else{
+                    //console.log("eyebrow raise with time remaining: " + timeLeft+ " elapsed: " + timeElapsed)
+                    eyebrow_anim_index = 0;
+                }
+            }
+            var randomize_blinks = function(duration){
+                if( duration > 500 ){
+                    trigger_randomized_blink()
+                } 
+                if( duration > 5000 ){
+                    setTimeout(trigger_randomized_blink, duration/2)
+                } 
+                if( duration > 1500 ){
+                    // 0.5 should be the length of the eyebrow animation
+                    var eyebrow_anim_duration = 500
+                    setTimeout(trigger_randomized_blink, duration - 500 )
+                }
+            }
+            var play_for_duration = function(duration) {
+                pingpong = true;
+                playing = true;
+                playDuration = duration;
+                startTime = Date.now();
+                step();
+                if( num_blink_frames > 0 || num_eyebrow_frames > 0 ){
+                    randomize_blinks(duration);
+                }
+            }
+
+            var pause = function() {
                 playing = false;
             };
 
@@ -796,6 +1039,9 @@
                 step: step,
                 play: play,
                 pause: pause,
+                play_for_duration: function(duration) {
+                    play_for_duration(duration);
+                },                 
                 playing: playing,
                 move_relative: stepFrame,
                 current_frame: function() { return i; },
@@ -832,7 +1078,29 @@
             // I guess that's all for now.
             app: {
                 // TODO: Is there much point in actually supporting iterations?
-                NETSCAPE: withProgress(doNothing)
+                NETSCAPE: withProgress(doNothing),
+                TALKR: withProgress(function(block){
+
+                    if(block.channelIdentifier == '0' ){
+                        blink_index = block.frameIndex;
+                        num_blink_frames = block.numframes;
+                        if( blink_index > 0 && last_lipsync_frame ==0 ){
+                             last_lipsync_frame = blink_index -1;
+                        }
+                        //console.log("found blink channel identifier at index " + blink_index + " with " + num_blink_frames + " frames." );
+                    }else if( block.channelIdentifier == '1'){
+                        
+                        eyebrow_index = block.frameIndex;
+                        num_eyebrow_frames = block.numframes;
+                        if( eyebrow_index > 0 && last_lipsync_frame ==0 ){
+                             last_lipsync_frame = eyebrow_index -1;
+                        }
+                        //console.log("found eyebrow channel identifier at index " + eyebrow_index + " with " + num_eyebrow_frames + " frames." );
+                    }else{
+                        // console.log(block.channelIdentifier)
+                        // Handle the animation channel here.
+                    }
+                })
             },
             img: withProgress(doImg, true),
             eof: function (block) {
@@ -845,6 +1113,14 @@
                 }
                 player.init();
                 loading = false;
+                if( last_lipsync_frame == 0 ){
+                    last_lipsync_frame = frames.length;
+                }
+
+                // Is there a better place for this?
+                canvas.parentNode.style.width = canvas.width + 'px';
+                canvas.parentNode.style.height =  canvas.height + 'px';
+
                 if (load_callback) {
                     load_callback(gif);
                 }
@@ -861,6 +1137,10 @@
             toolbar = document.createElement('div');
 
             tmpCanvas = document.createElement('canvas');
+            
+            // a separate canvas is used for eyebrow & blinks
+            eyebrowCanvas = document.createElement('canvas');
+            blinkCanvas = document.createElement('canvas');
 
             div.width = canvas.width = gif.width;
             div.height = canvas.height = gif.height;
@@ -868,6 +1148,8 @@
 
             div.className = 'jsgif';
             toolbar.className = 'jsgif_toolbar';
+            div.appendChild(eyebrowCanvas);
+            div.appendChild(blinkCanvas);
             div.appendChild(canvas);
             div.appendChild(toolbar);
 
@@ -889,7 +1171,7 @@
             return scale;
         }
 
-        var canvas, ctx, toolbar, tmpCanvas;
+        var canvas, ctx, toolbar, tmpCanvas, eyebrowCanvas, blinkCanvas;
         var initialized = false;
         var load_callback = false;
 
@@ -911,6 +1193,9 @@
 
         return {
             // play controls
+            play_for_duration: function(duration) {
+                player.play_for_duration(duration);
+            },            
             play: player.play,
             pause: player.pause,
             move_relative: player.move_relative,

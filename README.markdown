@@ -1,84 +1,109 @@
 # Overview
 
-Forked from the excelent jsgif project (https://github.com/shachaf/jsgif), which was implemented as a bookmarklet to manipulate animated gifs (http://slbkbs.org/jsgif).
+Forked from the excelent [libgif-js project](https://github.com/buzzfeed/libgif-js), which is a general-purpose gif parsing and playback framework. 
 
-This is an attempt to pull out the gif parsing and playing logic, seperate it from the bookmarklet, and publish it as a library that you can use in your project.
+This is an attempt to animate a GIF file in sync with the [SpeechSynthesis web API](https://developer.mozilla.org/en-US/docs/Web/API/SpeechSynthesis).  The following tricks are used to improve results:
 
-As an added bonus, you can make gifs "rubbable" so that scrubbing with your mouse (or rubbing with your finger on a touch device) cause the gif to move back and forth.
+* The SpeechSynthesis start event is used to start the gif animation.
+
+* speech duration is estimated using the length of the text to be spoken and passed to the the play_with_duration() function
+
+* the gif "ping-pongs" while there is talking, and always starts and ends at frame 0.  (the direction of playback is reversed at the correct time such that playback ends at frame zero)  
+
+* speech synthesis is broken up into punctuation-deliminated [.,?!] utterances, and each utterance is animated with its own call to play_with_duration.  Pauses in the utterances are then automatically aligned with periods of non-movement in the GIF file.
+
+# GIF Selection
+
+Here are some tips for selecting an optimal GIF file (in rough order of importance)
+
+* The GIF should feature something talking (obviously)
+
+* Frame 0 should have the mouth closed
+
+* The mouth should open relatively quickly in the early frames
+
+* For several frames after the initial opening, avoid frames that completely close the mouth.  This can result in an overly flappy mouth.
+
+* Avoid large gestures or movements in the early frames which will be repeated very frequently.
+
+* More than a second or two of animation is overkill, the early frames are more important that what comes later.
+
+
+# TALKRAPP Gif App Extension
+
+A new GIF app extension was created to specify animation channels that could be layered on top of the lipsync animation. The app extension is similar to the popular NETSCAPE looping extension.  The extension does not alter how the GIF is played back in browsers where there is no support for it.
+
+## Eyebrows and Blinks
+The app extension is used to determine which frames (if any) should be used to create eyebrow and blink animations.  These are not looped as part of the normal animation, and instead are layered on top at random intervals.  This can bring movement to the upper part of the face with out making the gif overly repetitive or predictable.
+
+A future version of the iOS app Talkr (www.talkrapp.com) will support outputing .GIF files with this extension, but for now a selection of examples is available from [imgur](http://imgur.com/a/NRZVQ) .  You can find some regular gif files without the TALKRAPP extension [here](http://imgur.com/a/qgptp).
+
+## Extension Definition
+```
+    +---------------+
+ 0  |     0x21      |  Extension Label
+    +---------------+
+ 1  |     0xFF      |  Application Extension Label
+    +---------------+
+ 2  |     0x0B      |  Block Size
+    +---------------+
+ 3  |               | 
+    +-             -+
+ 4  |               | 
+    +-             -+
+ 5  |               | 
+    +-             -+
+ 6  |               | 
+    +-  TALKRAPP   -+  Application Identifier (8 bytes)
+ 7  |               | 
+    +-             -+
+ 8  |               | 
+    +-             -+
+ 9  |               | 
+    +-             -+
+10  |               | 
+    +---------------+
+11  |               | 
+    +-             -+
+12  |      2.0      |  Application Authentication Code (3 bytes)
+    +-             -+
+13  |               | 
+    +===============+                      --+
+14  |     0x03      |  Sub-block Data Size   |
+    +---------------+                        |
+15  |               |                        |
+    +- FRAME INDEX -+                        | 
+16  |               |                        |
+    +---------------+                        |
+17  |               | Application Data Sub-block
+    +- NUM  FRAMES -+                        |
+18  |               |                        |  
+    +---------------+                        |							
+19  |  CHANNEL IDX  | ('0'=Blink,'1'=Eyebrow)|
+	+---------------+                        | 
+20  |               |                        | 
+    +-             -+                        |
+21  |               |                        | 
+    +-  RESERVED   -+                        |
+22  |               |                        | 
+    +-             -+                        |
+23  |               |                        | 
+    +===============+                      --+
+24  |     0x00      |  Block Terminator
+    +---------------+
+```
 
 # Example
 
-Please see example.html for, you know, an example. This will demonstrate how to use basic play controls for a gif, and also a rubbable one.
+Please see example.html for, you know, an example. It allows you to change the voice and text and watch it talk on various GIFs.
 
 Please note: this example must be loaded via a webserver, not directly from disk. I.e. http://localhost/libgif-js/example.html NOT file:///libgif-js/example.html. See the same-domain origin caveat at the bottom of this document for more information.
 
-For a hosted example, check out this post on BuzzFeed.com (http://www.buzzfeed.com/yacomink/rubbable-gifs)
+For a hosted example, check out this post on [talkrapp.com](http://www.talkrapp.com/gifdemo/example.html)
 
 # Technical Details
 
-Of note to the developer, libjs.gif contains a class SuperGif, which can be used to manipulate animated gifs.
-
-## Class: SuperGif
-
-### Example usage:
-
-```html
-		<img src="./example1_preview.gif" rel:animated_src="./example1.gif"
-		width="360" height="360" rel:auto_play="1" rel:rubbable="1" />
-
-		<script type="text/javascript">
-			$$('img').each(function (img_tag) {
-				if (/.*\.gif/.test(img_tag.src)) {
-					var rub = new SuperGif({ gif: img_tag } );
-					rub.load(function(){
-						console.log('oh hey, now the gif is loaded');
-					});
-				}
-			});
-		</script>
-```
-
-### Image tag attributes:
-
-* **rel:animated_src** -	If this url is specified, it's loaded into the player instead of src.
-					This allows a preview frame to be shown until animated gif data is streamed into the canvas
-
-* **rel:auto_play** -		Defaults to 1 if not specified. If set to zero, a call to the play() method is needed
-
-* **rel:rubbable** -		Defaults to 0 if not specified. If set to 1, the gif will be a canvas with handlers to handle rubbing.
-
-### Constructor options
-
-* **gif**		-		Required. The DOM element of an img tag.
-* **loop_mode**	-			Optional. Setting this to false will force disable looping of the gif.
-* **auto\_play** -			Optional. Same as the rel:auto_play attribute above, this arg overrides the img tag info.
-* **max\_width** -			Optional. Scale images over max\_width down to max_width. Helpful with mobile.
-* **rubbable** -			Optional. Make it rubbable.
-* **on_end** -				Optional. Add a callback for when the gif reaches the end of a single loop (one iteration). The first argument passed will be the gif HTMLElement.
-* **loop_delay** -			Optional. The amount of time to pause (in ms) after each single loop (iteration).
-* **progressbar_height** -			Optional. The height of the progress bar.
-* **progressbar_background_color** -			Optional. The background color of the progress bar.
-* **progressbar_foreground_color** -			Optional. The foreground color of the progress bar.
-
-### Instance methods
-
-#### loading
-* **load( callback )** -	Loads the gif specified by the src or rel:animated_src sttributie of the img tag into a canvas element and then calls callback if one is passed
-* **load_url( src, callback )** -	Loads the gif file specified in the src argument into a canvas element and then calls callback if one is passed
-
-#### play controls
-* **play** -				Start playing the gif
-* **pause** -				Stop playing the gif
-* **move_to(i)** -		Move to frame i of the gif
-* **move_relative(i)** -	Move i frames ahead (or behind if i < 0)
-
-#### getters
-* **get_canvas** - The canvas element that the gif is playing in. Handy for assigning event handlers to.
-* **get_playing** - Whether or not the gif is currently playing
-* **get_loading** - Whether or not the gif has finished loading/parsing
-* **get\_auto_play** - Whether or not the gif is set to play automatically
-* **get_length** - The number of frames in the gif
-* **get\_current_frame** - The index of the currently displayed frame of the gif
+Of note to the developer, libjs.gif contains a class SuperGif, which can be used to manipulate animated gifs. For more information on how to use the SuperGif class, check out the original [libgif project](https://github.com/buzzfeed/libgif-js).
 
 ## Caveat: same-domain origin
 

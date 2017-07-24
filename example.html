@@ -1,43 +1,95 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
-
 	<head>
 		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-		<script type="text/javascript" src="./libgif.js"></script>
-		<script type="text/javascript" src="./rubbable.js"></script>
+		
+		
 		<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no">
 		<title>
-			Example gif
+		TTS GIF Example
 		</title>
+		<meta name="description" content="Example of using GIF files to bring text to speech voices to life in your browser.">
+		<script type="text/javascript" src="./libgif.js"></script>
 	</head>
-
+	<style>
+			
+		/* the superGifCanvas elements can be styled if you need to*/
+		/*
+		.superGifCanvas {
+			width:100%;
+		}
+		*/
+		* {
+		    -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+		}
+		.guierrormessage {
+			color: #FF0000;
+		}
+		.guioption{
+			width: 280px;
+			padding: 0.2em;
+			font-size: 1em;
+			display: inline-block;
+			box-shadow: 0 2px 3px rgba(0, 0, 0, 0.1) inset;
+		}
+		#giferrormessage {
+			display: inline-block;
+		}
+		#newgifbutton {
+		font-size: 1.0rem;
+		padding: 0.5rem 0.6em;
+		background: #69c773;
+		border-bottom: 1px solid #498b50;
+		color: white;
+		-webkit-font-smoothing: antialiased;
+		font-weight: bold;
+		margin: 0;
+		height: 35px;
+		text-align: center;
+		}
+		#texttospeakinput {
+			width:96%;
+		}
+	</style>
 	<body>
 		<center>
-			<h1>Example with controls and no auto-play</h1>
-			<img id="example1" src="./example_gifs/rub_test_preview.jpg" rel:animated_src="./example_gifs/rub_test.gif" rel:auto_play="0" width="467" height="375" />
-			<br>
-			<script type="text/javascript">
-				var sup1 = new SuperGif({ gif: document.getElementById('example1') } );
-				sup1.load();
-			</script>
-			<a href="javascript:;" onmousedown="sup1.pause(); return false;">Pause</a> |
-			<a href="javascript:;" onmousedown="sup1.play(); return false;">Play</a> |
-			<a href="javascript:;" onmousedown="sup1.move_to(0); return false;">Restart</a> |
-			<a href="javascript:;" onmousedown="sup1.move_relative(1); return false;">Step forward</a> |
-			<a href="javascript:;" onmousedown="sup1.move_relative(-1); return false;">Step back</a>
+		
+		<div id="ttsoptions">
+			<div>
+				<label>Voice:</label>
+			<select id="voiceSelecter" class="guioption"></select>
+		</div>
+		<div>
 
-			<h1>Example with rubbing and auto-play on</h1>
-			<img id="example2" src="./example_gifs/rub_test.gif" rel:auto_play="1" width="467" height="375" rel:rubbable="1" />
-			<br>
-			<script type="text/javascript">
-				var sup2 = new RubbableGif({ gif: document.getElementById('example2') } );
-				sup2.load();
-			</script>
-
-			<br><br>
-			<p>Image via <a href="http://mlkshk.com/p/IP08">mlkshk</a></p>
-		</center>
-
-	</body>
-
+			<input type="text" id="texttospeakinput" value="Pretty cool. I didn't know gifs could talk." class="guioption"  onClick="this.setSelectionRange(0, this.value.length)" >
+			<div id="texterrormessage" class="guierrormessage"></div>
+		</div>
+		<div>
+			<button id="newgifbutton">GIF</button>
+			<input type="text" id="gifurlinput" value="http://i.imgur.com/nIYJ3hf.gif" class="guioption" onClick="this.setSelectionRange(0, this.value.length)">
+			<div id="giferrormessage" class="guierrormessage"></div>
+		</div>
+	</div>
+	<div id="instructions">Click on the image below to hear the message.</div>
+	<script type="text/javascript">
+	</script>
+	<div >
+		<a href="javascript:playsyncronized()">
+			<div id="imagecontainer">
+				<img id="exampleimg" src="http://i.imgur.com/nIYJ3hf.gif" rel:animated_src="http://i.imgur.com/nIYJ3hf.gif" rel:auto_play="0" />
+			</div>
+		</a>
+	</div>
+	<br>
+	
+	<div id="footer">
+		<h3>More Information</h3>
+		<div><a href="https://github.com/talkr-app/libgif-js">Github Project</a></div>
+		<div><a href="https://imgur.com/a/NRZVQ">Sample GIFs</a></div>
+		<div><a href="https://talkrapp.com">Talkr</a></div>
+		<script type="text/javascript" src="./example.js"></script>
+	</div>
+	</center>
+</div>
+</body>
 </html>
