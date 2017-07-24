@@ -80,7 +80,7 @@ A future version of the iOS app Talkr (www.talkrapp.com) will support outputing 
 18  |               |                        |  
     +---------------+                        |							
 19  |  CHANNEL IDX  | ('0'=Blink,'1'=Eyebrow)|
-	+---------------+                        | 
+    +---------------+                        | 
 20  |               |                        | 
     +-             -+                        |
 21  |               |                        | 

@@ -850,12 +850,11 @@
 
                 if(blink_anim_index >= 0){
                     if( blink_anim_index >= blink_anim.length ){
-                        alert("Blink index issue: blink_anim_index >= blink_anim.length")
+                        console.log("Warning! Blink index issue: blink_anim_index >= blink_anim.length")
                     } else {
                         var frame_i = blink_anim[blink_anim_index]
                         if( frames.length <= frame_i ) {
-                            console.log("frames.length:" + frames.length + "   frame_i: " + frame_i)
-                            alert("Blink index issue: frames.length > frame_i");
+                            console.log("Warning! Blink issue: frames.length <= blink_anim[blink_anim_index]")
                         } else{
                             //console.log("adding blink to canvas: "+ frame_i)
                             var offset = frameOffsets[frame_i];
@@ -876,13 +875,11 @@
                 eyebrowCanvas.getContext("2d").clearRect(0,0,eyebrowCanvas.width, eyebrowCanvas.height);
                 if(eyebrow_anim_index >= 0){
                     if( eyebrow_anim_index >= eyebrow_anim.length ){
-                        console.log("eyebrow_anim_index:" + eyebrow_anim_index + "    eyebrow_anim.length: " +  eyebrow_anim.length)
-                        alert("Eyebrow index issue: eyebrow_anim_index >= eyebrow_anim.length")
+                        console.log("Eyebrow index issue: eyebrow_anim_index >= eyebrow_anim.length")
                     } else {
                         var frame_i = eyebrow_anim[eyebrow_anim_index]
                         if( frames.length <= frame_i ) {
-                            console.log("frames.length:" + frames.length + "   frame_i: " + frame_i)
-                            alert("Eyebrow index issue: frames.length > frame_i");
+                            console.log("Eyebrow index issue: frames.length > frame_i");
                         } else{
                             //console.log("adding Eyebrow to canvas: "+ frame_i)
                             var offset = frameOffsets[frame_i];
