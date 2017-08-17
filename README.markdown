@@ -65,7 +65,7 @@ A future version of the iOS app Talkr (www.talkrapp.com) will support outputing 
     +---------------+
 11  |               | 
     +-             -+
-12  |      2.0      |  Application Authentication Code (3 bytes)
+12  |      COM      |  Application Authentication Code (3 bytes)
     +-             -+
 13  |               | 
     +===============+                      --+
