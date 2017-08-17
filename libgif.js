@@ -433,6 +433,139 @@
         parse();
     };
 
+   
+
+    // tick_to_frame is a function taking a frame index as arg.  Passing -1 clears the canvas
+    var gestureController = function(start_frame, num_frames, tick_to_frame){
+        var self = this;
+        self.frame_indexes = [];
+        for(var i = 0; i < num_frames; ++i){
+            self.frame_indexes.push(start_frame + i)
+        }
+
+        var anim_copy = null;
+        var paused = false;
+        self.on_anim_complete = null;
+
+
+        self.restore_default_anim = function(){
+            self.anim = anim_copy.slice();
+            if(self.loop && self.anim.length > 0){
+                self.anim[self.anim.length-1].delay = self.loop_end_delay + Math.random() * self.loop_end_delay_random;
+            }                  
+        }        
+        // default_delay - the amount of time each frame is displayed during the ping-pong anim
+        // loop_end_delay - null for no looping.  Otherwise, the minimum amount of time before looping
+        // loop_end_delay_random - defaults to 0.  A random amount of ms added to loop_end_delay so each loop is different
+        self.construct_default_anim = function(default_delay, loop_end_delay, loop_end_delay_random){
+
+            if(!default_delay) default_delay = 100;
+            self.loop = loop_end_delay != null;
+
+            if(!loop_end_delay) loop_end_delay = 0;
+            if(!loop_end_delay_random) loop_end_delay_random = 0;
+
+            self.loop_end_delay = loop_end_delay;
+            self.loop_end_delay_random = loop_end_delay_random;
+
+            self.anim = [];
+            self.frame_indexes.forEach(function(i){
+                self.anim.push([i, default_delay]);
+            });;
+            var frame_indexes_reversed = self.frame_indexes.slice().reverse();
+            
+            // Don't duplicate last frame
+            frame_indexes_reversed.shift()
+
+            // tick back to the first frame
+            frame_indexes_reversed.forEach(function(i){
+                self.anim.push([i, default_delay]);
+            });
+            
+            var calculated_loop_delay = default_delay;  
+            if( self.loop ){
+                calculated_loop_delay =  loop_end_delay + Math.random() * loop_end_delay_random;
+                self.on_anim_complete = function(){
+                    
+                    tick_anim();
+                }
+            } else {
+                self.on_anim_complete = null;
+            }
+            self.anim.push([-1, calculated_loop_delay]);
+            anim_copy = self.anim.slice();
+            
+        }
+        // Doesn't effect the current anim.
+        self.update_default_anim = function(custom_anim, loop_end_delay, loop_end_delay_random){
+            self.loop = loop_end_delay != null;
+            self.loop_end_delay = loop_end_delay;
+            self.loop_end_delay_random = loop_end_delay_random;            
+            anim_copy = custom_anim.slice();
+            if(self.loop){
+                self.on_anim_complete = function(){
+                    tick_anim();
+                } 
+            } else {
+                self.on_anim_complete = null;
+            }
+        }
+
+        var tick_anim = function(){
+            var anim = self.anim;
+            if( paused ){
+                paused = false;
+                return;
+            }
+            if(anim){
+                if( anim.length > 0 && anim[0] ){
+                    var i = anim[0][0];
+                    var d = anim[0][1];
+                    anim.shift();
+                    if(d && i ){
+                        tick_to_frame(i)
+                        if(d > 0){
+                            setTimeout(tick_anim, d);
+                        } else {
+                            tick_anim();
+                        }
+                    }
+                } else {
+                    self.restore_default_anim();
+                    if(self.on_anim_complete){
+                        self.on_anim_complete();
+                    }
+                }
+            }
+        }
+        // construct a default animation
+        self.construct_default_anim(self.default_delay);
+
+
+        self.clear = function(){
+            tick_to_frame(-1);
+            self.anim = [];
+            self.on_anim_complete = null;
+        }
+        self.pause = function(){
+            paused = true;
+        }
+        self.resume = function(){
+            paused = false;
+            tick_anim();
+        }        
+        self.play = function(customOnFinished){
+            if(customOnFinished){
+                self.on_anim_complete = customOnFinished;
+            }
+            paused = false; 
+            tick_anim();
+        }
+
+        return self;
+    }
+
+
     var SuperGif = function ( opts ) {
         var options = {
             //viewport position
@@ -475,17 +608,9 @@
         //leaving any animation data after it available for 
         // eyebrow-raises, blinks, or other
         var last_lipsync_frame = 0;
-        var blink_anim = [22,24,23,22];  // Todo: remove hard coded
-        var eyebrow_anim = [25,26,27,27,27,28,28,28,28,26,26,25];// Todo: remove hard coded
 
-        var blink_index = 0;
-        var eyebrow_index = 0;
-        var num_blink_frames = 0;
-        var num_eyebrow_frames = 0;
-
-        // when these are > -1 they tick to the end and back
-        var blink_anim_index = -1;
-        var eyebrow_anim_index = -1;
+        // the keys to this dict are the channel identifiers.  '0' for blink, '1' for eyebrows.
+        var talkr_channels = {};
 
         var ctx_scaled = false;
 
@@ -689,7 +814,7 @@
             var delayTime = delay == 0 ? defaultFrameTime : delay;
             // Count the total animation time for all lip-sync frames
             // so we can estimate when to reverse ticking direction
-            if((frames.length <= blink_index || blink_index == 0 ) && ( frames.length <= eyebrow_index || eyebrow_index == 0)){
+            if(frames.length <= last_lipsync_frame){
                 totalLipsyncAnimTime = totalLipsyncAnimTime + delayTime * 10;
             }            
         };
@@ -723,12 +848,8 @@
                 if (lastDisposalMethod === 3) {
 
                     var bPreserveTalkrTransparency = false;
-                    if( currIdx >= blink_index && currIdx < blink_index + num_blink_frames){
-                        // we are on a blink frame.  We need to keep the transparency.
-                        bPreserveTalkrTransparency = true;
-                    }
-                    if( currIdx >= eyebrow_index && currIdx < eyebrow_index + num_eyebrow_frames){
-                        // we are on an eyebrow frame.  We need to keep the transparency.
+                    if( currIdx >= last_lipsync_frame){
+                        // we are on a talkr extension frame.  We need to keep the transparency.
                         bPreserveTalkrTransparency = true;
                     }
                     // Restore to previous
@@ -844,62 +965,7 @@
                 };
             }());
 
-            // assumes max >= index >= min,
-            // max > min 
-            var tickBlinksAndEyebrows = function(){
 
-                if(blink_anim_index >= 0){
-                    if( blink_anim_index >= blink_anim.length ){
-                        console.log("Warning! Blink index issue: blink_anim_index >= blink_anim.length")
-                    } else {
-                        var frame_i = blink_anim[blink_anim_index]
-                        if( frames.length <= frame_i ) {
-                            console.log("Warning! Blink issue: frames.length <= blink_anim[blink_anim_index]")
-                        } else{
-                            //console.log("adding blink to canvas: "+ frame_i)
-                            var offset = frameOffsets[frame_i];
-                            blinkCanvas.getContext("2d").putImageData(frames[frame_i].data, offset.x, offset.y);
-                        }
-                    }
-                    blink_anim_index += 1;
-                    if( blink_anim_index >=  blink_anim.length ){
-                        blink_anim_index = -1;
-                        blinkCanvas.getContext("2d").clearRect(0,0,blinkCanvas.width, blinkCanvas.height);
-                    }
-                    else
-                    {
-                        blinkCanvas.getContext("2d").drawImage(blinkCanvas, 0, 0);
-                    }                    
-                }
-
-                eyebrowCanvas.getContext("2d").clearRect(0,0,eyebrowCanvas.width, eyebrowCanvas.height);
-                if(eyebrow_anim_index >= 0){
-                    if( eyebrow_anim_index >= eyebrow_anim.length ){
-                        console.log("Eyebrow index issue: eyebrow_anim_index >= eyebrow_anim.length")
-                    } else {
-                        var frame_i = eyebrow_anim[eyebrow_anim_index]
-                        if( frames.length <= frame_i ) {
-                            console.log("Eyebrow index issue: frames.length > frame_i");
-                        } else{
-                            //console.log("adding Eyebrow to canvas: "+ frame_i)
-                            var offset = frameOffsets[frame_i];
-                            eyebrowCanvas.getContext("2d").putImageData(frames[frame_i].data, offset.x, offset.y);
-                        }
-                    }
-                    
-                    eyebrow_anim_index += 1;
-                    if( eyebrow_anim_index >=  eyebrow_anim.length ){
-                        eyebrow_anim_index = -1;
-                        eyebrowCanvas.getContext("2d").clearRect(0,0,eyebrowCanvas.width, eyebrowCanvas.height);
-                    }
-                    else
-                    {
-                        //eyebrowCanvas.getContext("2d").drawImage(eyebrowCanvas, 0, 0);
-                        eyebrowCanvas.getContext("2d").drawImage(eyebrowCanvas, 0, 0);
-                    }
-
-                }   
-            }
             var setFrameIndexAndDirection = function() {
                 // if ping-ponging, these are equivalent
                 i = Math.abs(i);
@@ -917,10 +983,6 @@
                 }
                 if (timeLeft < 0) {
                     i = 0;
-                    eyebrow_anim_index = -1;
-                    blink_anim_index = -1;
-                    eyebrowCanvas.getContext("2d").clearRect(0,0,eyebrowCanvas.width, eyebrowCanvas.height);
-                    blinkCanvas.getContext("2d").clearRect(0,0,blinkCanvas.width, blinkCanvas.height);
                     pause();
                 }
 
@@ -954,9 +1016,6 @@
                 ctx.globalCompositeOperation = "copy";
                 ctx.drawImage(tmpCanvas, 0, 0);
 
-                if( num_blink_frames > 0 || num_eyebrow_frames > 0 ){
-                    tickBlinksAndEyebrows();
-                }
             };
 
             var play = function () {
@@ -964,52 +1023,12 @@
                 playing = true;
                 step();
             };
-
-            var trigger_randomized_blink = function(){
-                random = Math.random();
-
-                // Don't do it all the time
-                if( random < 0.6) return;
-
-                var timeElapsed = Date.now() - startTime;
-                var timeLeft = playDuration - timeElapsed;
-
-                if( random > 0.85 ){
-                    blink_anim_index = 0;
-                    eyebrow_anim_index = 0;
-                    //console.log("eyebrow raise and blink with time remaining: " + timeLeft + " elapsed: " + timeElapsed)
-                }
-                else if( random > 0.7 ){
-                    blink_anim_index = 0;
-                    //console.log("blink with time remaining: " + timeLeft+ " elapsed: " + timeElapsed)
-                }
-                else{
-                    //console.log("eyebrow raise with time remaining: " + timeLeft+ " elapsed: " + timeElapsed)
-                    eyebrow_anim_index = 0;
-                }
-            }
-            var randomize_blinks = function(duration){
-                if( duration > 500 ){
-                    trigger_randomized_blink()
-                } 
-                if( duration > 5000 ){
-                    setTimeout(trigger_randomized_blink, duration/2)
-                } 
-                if( duration > 1500 ){
-                    // 0.5 should be the length of the eyebrow animation
-                    var eyebrow_anim_duration = 500
-                    setTimeout(trigger_randomized_blink, duration - 500 )
-                }
-            }
             var play_for_duration = function(duration) {
                 pingpong = true;
                 playing = true;
                 playDuration = duration;
                 startTime = Date.now();
                 step();
-                if( num_blink_frames > 0 || num_eyebrow_frames > 0 ){
-                    randomize_blinks(duration);
-                }
             }
 
             var pause = function() {
@@ -1078,24 +1097,12 @@
                 NETSCAPE: withProgress(doNothing),
                 TALKR: withProgress(function(block){
 
-                    if(block.channelIdentifier == '0' ){
-                        blink_index = block.frameIndex;
-                        num_blink_frames = block.numframes;
-                        if( blink_index > 0 && last_lipsync_frame ==0 ){
-                             last_lipsync_frame = blink_index -1;
+                    talkr_channels[block.channelIdentifier] = {index:block.frameIndex, numframes:block.numframes};
+
+                    if( block.frameIndex > 0 ){
+                        if(last_lipsync_frame==0 || last_lipsync_frame >= block.frameIndex ){
+                            last_lipsync_frame = block.frameIndex;
                         }
-                        //console.log("found blink channel identifier at index " + blink_index + " with " + num_blink_frames + " frames." );
-                    }else if( block.channelIdentifier == '1'){
-                        
-                        eyebrow_index = block.frameIndex;
-                        num_eyebrow_frames = block.numframes;
-                        if( eyebrow_index > 0 && last_lipsync_frame ==0 ){
-                             last_lipsync_frame = eyebrow_index -1;
-                        }
-                        //console.log("found eyebrow channel identifier at index " + eyebrow_index + " with " + num_eyebrow_frames + " frames." );
-                    }else{
-                        // console.log(block.channelIdentifier)
-                        // Handle the animation channel here.
                     }
                 })
             },
@@ -1113,7 +1120,7 @@
                 if( last_lipsync_frame == 0 ){
                     last_lipsync_frame = frames.length;
                 }
-
+                initialize_talkr_channels()
                 // Is there a better place for this?
                 canvas.parentNode.style.width = canvas.width + 'px';
                 canvas.parentNode.style.height =  canvas.height + 'px';
@@ -1124,7 +1131,41 @@
 
             }
         };
+        var initialize_talkr_channels = function(){
 
+            var blink_key = '0';
+            var eyebrow_key = '1'
+            if(talkr_channels[blink_key]){
+                var numframes = talkr_channels[blink_key].numframes;
+                var startframe = talkr_channels[blink_key].index;
+
+                talkr_channels[blink_key].controller  = new gestureController(startframe, numframes, function(index){
+                    if(!index || index < 0){
+                        blinkCanvas.getContext("2d").clearRect(0,0,eyebrowCanvas.width, eyebrowCanvas.height);
+                    } else {
+                        if( index < frameOffsets.length && index < frames.length ){
+                            var offset = frameOffsets[index];
+                            blinkCanvas.getContext("2d").putImageData(frames[index].data, offset.x, offset.y);
+                        }
+                    }
+                });
+            }
+
+            if(talkr_channels[eyebrow_key]){
+                var numframes = talkr_channels[eyebrow_key].numframes;
+                var startframe = talkr_channels[eyebrow_key].index;                
+                talkr_channels[eyebrow_key].controller = new gestureController(startframe, numframes, function(index){
+                    if(!index || index < 0){
+                        eyebrowCanvas.getContext("2d").clearRect(0,0,eyebrowCanvas.width, eyebrowCanvas.height);
+                    } else {
+                        if( index < frameOffsets.length && index < frames.length ){
+                            var offset = frameOffsets[index];
+                            eyebrowCanvas.getContext("2d").putImageData(frames[index].data, offset.x, offset.y);
+                        }
+                    }
+                });
+            }         
+        }
         var init = function () {
             var parent = gif.parentNode;
 
@@ -1172,6 +1213,7 @@
         var initialized = false;
         var load_callback = false;
 
+        var eyebrowGestureController, blinkGestureController;
         var load_setup = function(callback) {
             if (loading) return false;
             if (callback) load_callback = callback;
@@ -1206,6 +1248,9 @@
             get_auto_play    : function() { return options.auto_play },
             get_length       : function() { return player.length() },
             get_current_frame: function() { return player.current_frame() },
+            get_talkr_ext    : function(key) {
+                return talkr_channels[key];
+            },
             load_url: function(src,callback){
                 if (!load_setup(callback)) return;
 

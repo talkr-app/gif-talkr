@@ -4,7 +4,9 @@
 
 // Load the Gif
 var sup1 = new SuperGif({ gif: document.getElementById('exampleimg') } );
-sup1.load();
+sup1.load(function(){
+	setup_blinks_and_eyebrows(sup1)
+});
 
 
 var instructions = document.getElementById('instructions');
@@ -51,6 +53,58 @@ window.speechSynthesis.onvoiceschanged = function(e) {
 // ----------------------
 // Load new GIFs
 // ----------------------
+
+var setup_blinks_and_eyebrows = function(superGifObject){
+	// This is an example of how to loop blink and eyebrow animations
+    var blink = superGifObject.get_talkr_ext('0');
+    var eyebrows = superGifObject.get_talkr_ext('1');
+    if( blink && blink.controller){
+    	blink.controller.construct_default_anim(50, 3000, 8000);   // loop blinks every 3-11 seconds (3000ms + randomly up to 8000ms additional)
+    	blink.controller.play();  
+    }
+    if( eyebrows && eyebrows.controller && eyebrows.index && eyebrows.numframes){
+    	// instead of looping the eyebrows, we'll trigger them manually when speaking.
+
+    	// Construct a default eyebrow animation with 100ms between each frame and no looping
+    	// eyebrows.controller.construct_default_anim(100, null, null );  // null passed for loop arguments so there is no looping..  
+
+    	// For illustration, here is a custom animation.  The brackets represent frames.  [frame_index, frame_duration_ms]
+    	// You can get the frames using eyebrows.index and eyebrows.numframes.
+    	// eyebrows.index is the first frame of the eyebrow anim (25)
+    	// eyebrows.numframes = 4.  (25,26,27,28 all contain valid eyebrow frames and can be used in the animation)
+    	// The last frame index is -1, meaning that the eyebrow canvas will be empty, showing the default eyebrows.
+    	// The last duration is meaningless unless we turn on looping, which we aren't going to do for eyebrows.
+    	var custom_anim = [[25,100],[26,100],[27,150],[28,400],[27,150],[26,100],[25,100],[-1,0]]
+
+    	// set the current animation to our custom one.
+    	eyebrows.controller.anim = custom_anim;
+
+    	// update the default animation.  The default is automatically queued up after the current animation finishes.
+    	eyebrows.controller.update_default_anim(custom_anim, null, null); // null passed for loop args
+
+    	// Here is a more complex example of the system:
+    	// Lets say you wanted to raise the eyebrows up, hold them there until the next time "play" is called
+    	// then bring them down, and revert to the default animation. 
+    	// 
+    	// var leave_eyebrows_up = [[25,100],[26,100],[27,200],[28,100]]
+    	// eyebrows.controller.anim = leave_eyebrows_up;
+    	// var bring_eyebrows_down = [[27,200],[26,100],[25,100],[-1,100]]
+    	// eyebrows.controller.play(function(){                                      //play takes on "onFinished" variable if you want to do a custom looping. 
+    	//	    eyebrows.controller.anim = bring_eyebrows_down;
+    	//  });
+    }
+}
+
+// Randomly trigger an eyebrow raise at some point during speech.
+var trigger_eyebrow_anim = function(superGifObject, duration){
+	if( Math.random() > 0.65 ) {
+		var eyebrows = superGifObject.get_talkr_ext('1');
+		if( eyebrows && eyebrows.controller){
+
+			setTimeout( eyebrows.controller.play, Math.random() * duration);
+		}
+	}
+}
 var gifurlinput = document.getElementById('gifurlinput')
 function loadNewGif(){
 		var gifURL = gifurlinput.value;
@@ -85,6 +139,7 @@ function loadNewGif(){
             sup1 = new SuperGif({ gif: imgElement });
             sup1.load(function(){
             	instructions.innerHTML = "Click on the image below to hear the message."
+            	setup_blinks_and_eyebrows(sup1);
             });
             document.getElementById('giferrormessage').innerHTML = "";
         }
@@ -165,8 +220,9 @@ function playsyncronized(){
 	            (function(dur){
                 	msg.addEventListener('start', function(){
                 		sup1.play_for_duration(dur);
-                		})
-	            })(speakingDurationEstimate);
+                		trigger_eyebrow_anim(sup1, dur);
+	                })
+                })(speakingDurationEstimate);
 
 	            // The end event is too inacurate to use for animation,
 	            // but perhaps it could be used elsewhere.  You might need to push 
