@@ -1,0 +1,22 @@
+{
+  "name": "gif-talkr",
+  "author": {
+    "name": "talkr",
+    "url": "https://talkrapp.com"
+  },
+  "version": "1.0.0",
+  "description":"Turn gif files into talking avatars for use with TTS or audio.",
+  "homepage":"https://github.com/talkr-app/gif-talkr",
+  "bugs":"https://github.com/talkr-app/gif-talkr/issues",
+  "keywords":["gif", "tts", "lip-sync", "lipsync", "lip syncronization", "avatar", "talkr", "chatbot"],
+  "license":"MIT",
+  "private": false,
+  "main":"libgif.js",
+  "repository" :{ 
+  	"type" : "git",
+  	"url" : "https://github.com/talkr-app/gif-talkr.git"
+  },  
+  "scripts":{
+  	"test":"echo \"Error: no test specified\" && exit 1"
+  }
+}
