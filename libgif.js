@@ -596,7 +596,7 @@
         var playing = true;
         var forward = true;
         var defaultFrameTime = 10;
-
+        var overrideFrameTime = null;
 
         // Variables for play_for_duration
         var totalLipsyncAnimTime = 0;
@@ -951,6 +951,10 @@
                     var delay = frames[i].delay * 10;
                     if (!delay) delay = defaultFrameTime * 10; // FIXME: Should this even default at all? What should it be?
 
+                    if (overrideFrameTime) {
+                        delay = overrideFrameTime;
+                    }
+
                     var nextFrameNo = getNextFrameNo();
                     if (nextFrameNo === 0) {
                         delay += loopDelay;
@@ -975,23 +979,28 @@
                 var timeElapsed = Date.now() - startTime;
                 var timeLeft = playDuration - timeElapsed;
 
+                // We assume/enforce a constant per-frame time here.
                 var perFrameTime = totalLipsyncAnimTime / num_lip_frames;
+                if (overrideFrameTime) {
+                    perFrameTime = overrideFrameTime;
+                }
                 if (forward) {
                     if (perFrameTime * (i + 1) > timeLeft) {
                         forward = false;
                     }
                 }
-                if (timeLeft < 0) {
-                    i = 0;
-                    pause();
-                }
 
-                if (i >= num_lip_frames){
+                if (i >= num_lip_frames) {
                     i = num_lip_frames - 1; // we'll play the last frame twice, but -2 could be more than frame.length
                     forward = false;
                 } else if (i == 0) {
                     forward = true;
-                } 
+                    // If there is only time to rapidly open/close the mouth, 
+                    // better to keep it closed.
+                    if (timeLeft < perFrameTime * 2) {
+                        pause();
+                    }
+                }
             }
 
             var putFrame = function() {
@@ -1023,7 +1032,17 @@
                 playing = true;
                 step();
             };
-            var play_for_duration = function(duration) {
+            var play_for_duration = function(duration, overrideFrameDuration) {
+                if (overrideFrameDuration) {
+                    overrideFrameTime = overrideFrameDuration
+                } else {
+                    overrideFrameTime = null;
+                }
+                if (duration > 0 && duration < 300) {
+                    overrideFrameTime = 125;
+                    // snapping the mouth open and close looks bad.
+                    duration = 300;
+                }
                 pingpong = true;
                 playing = true;
                 playDuration = duration;
@@ -1055,8 +1074,8 @@
                 step: step,
                 play: play,
                 pause: pause,
-                play_for_duration: function(duration) {
-                    play_for_duration(duration);
+                play_for_duration: function(duration, overrideFrameDuration) {
+                    play_for_duration(duration, overrideFrameDuration);
                 },                 
                 playing: playing,
                 move_relative: stepFrame,
@@ -1232,8 +1251,8 @@
 
         return {
             // play controls
-            play_for_duration: function(duration) {
-                player.play_for_duration(duration);
+            play_for_duration: function(duration, overrideFrameDuration) {
+                player.play_for_duration(duration, overrideFrameDuration);
             },            
             play: player.play,
             pause: player.pause,
