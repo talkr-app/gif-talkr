@@ -18,30 +18,32 @@ var instructions = document.getElementById('instructions');
 // Code for the voice select element
 var voiceSelecter = document.getElementById('voiceSelecter');
 function getVoices() {
-	voiceSelecter.innerHTML = "";
-	var voices = speechSynthesis.getVoices();
-	// iOS returns voices it doesn't let you use.
-	var bIsiOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-	var iOSVoiceSet = {};
-	if( bIsiOS ){ 
-		var array = ["Maged","Zuzana","Sara","Anna","Melina","Karen","Serena","Moira","Tessa","Samantha","Monica","Paulina","Satu","Amelie","Thomas","Carmit","Lekha","Mariska","Damayanti","Alice","Kyoko","Yuna","Ellen","Xander","Nora","Zosia","Luciana","Joana","Ioana","Milena","Laura","Alva","Kanya","Yelda","Ting-Ting","Sin-Ji","Mei-Jia"];
-		array.forEach(function(val){
-			iOSVoiceSet[val] = true;
-		});
-	}
-	voices.forEach(function(voice, i) {
-		// only some iOS voices are working, but they are all returned.
-		if( !bIsiOS || voice.name in iOSVoiceSet ){
-			var option = document.createElement('option');
-			option.value = voice.name;
-			option.innerHTML = voice.name;
-			if( voice.lang.substring(0,2) == "en" ){
-				voiceSelecter.insertBefore(option, voiceSelecter.firstChild);
-			}	else {
-				voiceSelecter.appendChild(option);
-			}
-		}
-	});
+	if(voiceSelecter){
+        voiceSelecter.innerHTML = "";
+    	var voices = speechSynthesis.getVoices();
+    	// iOS returns voices it doesn't let you use.
+    	var bIsiOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    	var iOSVoiceSet = {};
+    	if( bIsiOS ){ 
+    		var array = ["Maged","Zuzana","Sara","Anna","Melina","Karen","Serena","Moira","Tessa","Samantha","Monica","Paulina","Satu","Amelie","Thomas","Carmit","Lekha","Mariska","Damayanti","Alice","Kyoko","Yuna","Ellen","Xander","Nora","Zosia","Luciana","Joana","Ioana","Milena","Laura","Alva","Kanya","Yelda","Ting-Ting","Sin-Ji","Mei-Jia"];
+    		array.forEach(function(val){
+    			iOSVoiceSet[val] = true;
+    		});
+    	}
+    	voices.forEach(function(voice, i) {
+    		// only some iOS voices are working, but they are all returned.
+    		if( !bIsiOS || voice.name in iOSVoiceSet ){
+    			var option = document.createElement('option');
+    			option.value = voice.name;
+    			option.innerHTML = voice.name;
+    			if( voice.lang.substring(0,2) == "en" ){
+    				voiceSelecter.insertBefore(option, voiceSelecter.firstChild);
+    			}	else {
+    				voiceSelecter.appendChild(option);
+    			}
+    		}
+    	});
+    }    
 }
 getVoices();
 // Update the voices when they change (chrome loads asynchronously)
@@ -145,7 +147,7 @@ function loadNewGif(){
         }
         doesFileExist(gifURL, onFileExists)
 }
-gifurlinput.addEventListener('input', loadNewGif) 
+if(gifurlinput)gifurlinput.addEventListener('input', loadNewGif) 
 
 var imgurgifs = ["https://i.imgur.com/nIYJ3hf.gif", // lily
     "https://i.imgur.com/GTlEMHn.gif", // dog2
@@ -162,12 +164,16 @@ var imgurgifs = ["https://i.imgur.com/nIYJ3hf.gif", // lily
     "https://i.imgur.com/bRNJlO9.gif", // white walker
 ]
 var imgurgifindex = 0;
-document.getElementById("newgifbutton").addEventListener("click", function(){
-    imgurgifindex += 1;
-    imgurgifindex = imgurgifindex % imgurgifs.length;
-    gifurlinput.value = imgurgifs[imgurgifindex];  
-    loadNewGif();
-})
+var newgifbutton = document.getElementById("newgifbutton");
+if(newgifbutton){
+    newgifbutton.addEventListener("click", function(){
+        imgurgifindex += 1;
+        imgurgifindex = imgurgifindex % imgurgifs.length;
+        gifurlinput.value = imgurgifs[imgurgifindex];  
+        loadNewGif();
+    })
+}
+
 
 // ---------------------
 // Playing TTS in sync
