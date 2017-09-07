@@ -1,4 +1,54 @@
 /*
+    Date: September 5th, 2017
+    Github: https://github.com/talkr-app/gif-talkr
+    Description:    A javascript library for transforming GIF files into talking avatars. 
+                    Based on libgif, which is a general purpose gif parsing library.  Libgif
+                    provides the SuperGif class described below.
+    Added Functionality:
+
+        play_for_duration (duration, overrideFrameDuration, bPlayEyebrowAnim) - ping-pongs the lip-sync animation
+            for the duration.  Use overrideFrameDuration to specify how long each frame of animation is active for 
+            to speed up or slow down the animation.  Pass NULL to get a frame time derived from the GIF file frame
+            delays. bPlayEyebrowAnim defaults to true and specifies that a random eyebrow animation may accompany 
+            speech.
+        get_talkr_ext(channel_identifier) - Provides an interface for controling blink & eyebrow animation channels 
+            on GIF files with the talkr extension (exported with talkrapp.com). channel_identifier is '0' for blinks, 
+            '1' for eyebrows.  By default a looping blink animation is created and started on SuperGif.load() if a 
+            blink channel exists and the rel:autoplay_blinks option (an Image tag attribute)  is not set to 0.  The 
+            get_talkr_ext function  returns a controller with the following properties (or NULL if no controller 
+            exists):
+        
+          functions:
+            play(onFinished) - plays the current animation, then replaces the current animation with the default
+                and calls onFinished. Animations are specified as an array of [frame_index, duration] pairs.  Use 
+                -1 for the frame index to specify that the animation channel should be cleared (no frame displayed).  
+                The last frame will persist indefinitely, but the duration can impact when onFinished is called after
+                a call to play(onFinished). A simple blink animation looks like:
+                    var blink_anim = [
+                        [22, 50],
+                        [23, 50],
+                        [24, 50],
+                        [23, 50],
+                        [22, 50],
+                        [-1, 0]
+                    ]
+            pause - pauses the animation
+            resume - resumes a paused animation
+            clear - clears the current animation and any onFinished callback    
+            update_default_anim(custom_anim, loop_end_delay, loop_end_delay_random)  - changes the default animation to 
+                the one specified.  Does not change the anim property (current animation)
+            construct_default_anim(frame_duration, loop_end_delay, loop_end_delay_random) - Constructs a default  
+                animation that ping pongs through all frames.  If loop_end_delay is not null, the animation will loop.
+                construct_default_anim(50, 3000, 8000) would loop every 3-11 seconds (3000ms + randomly up to 
+                8000ms additional seconds, playing each frame for 50ms.).  Calling play with an onFinished callback
+                removes the automatic looping, as looping can be handled from the callback.
+          properties:
+            index - the frame index of the first GIF frame in this channel (typically 22 for blink, 25 for eyebrows)
+            numframes - the number of frames in this channel (typically 3 for blinks, 4 for eyebrows.)
+            anim - the current animation (the one that will play with the next call to play)
+
+
+    ------------------------------------
 	SuperGif
 
 	Example usage:
@@ -460,6 +510,8 @@
         self.construct_default_anim = function(default_delay, loop_end_delay, loop_end_delay_random){
 
             if(!default_delay) default_delay = 100;
+            self.default_delay =  default_delay;
+
             self.loop = loop_end_delay != null;
 
             if(!loop_end_delay) loop_end_delay = 0;
@@ -596,7 +648,23 @@
         var playing = true;
         var forward = true;
         var defaultFrameTime = 10;
-        var overrideFrameTime = null;
+
+        var ctx_scaled = false;
+
+        var frames = [];
+        var frameOffsets = []; // elements have .x and .y properties
+
+        var gif = options.gif;
+        if (typeof options.auto_play == 'undefined')
+            options.auto_play = (!gif.getAttribute('rel:auto_play') || gif.getAttribute('rel:auto_play') == '1');
+
+        // the keys to this dict are the channel identifiers.  '0' for blink, '1' for eyebrows.
+        var talkr_channels = {};
+
+        if (typeof options.autoplay_blinks == 'undefined')
+            options.autoplay_blinks = (!gif.getAttribute('rel:autoplay_blinks') || gif.getAttribute('rel:autoplay_blinks') == '1');
+        
+        var autoplay_blinks = options.autoplay_blinks;
 
         // Variables for play_for_duration
         var totalLipsyncAnimTime = 0;
@@ -609,17 +677,7 @@
         // eyebrow-raises, blinks, or other
         var last_lipsync_frame = 0;
 
-        // the keys to this dict are the channel identifiers.  '0' for blink, '1' for eyebrows.
-        var talkr_channels = {};
-
-        var ctx_scaled = false;
-
-        var frames = [];
-        var frameOffsets = []; // elements have .x and .y properties
-
-        var gif = options.gif;
-        if (typeof options.auto_play == 'undefined')
-            options.auto_play = (!gif.getAttribute('rel:auto_play') || gif.getAttribute('rel:auto_play') == '1');
+        var overrideFrameTime = null;
 
         var onEndListener = (options.hasOwnProperty('on_end') ? options.on_end : null);
         var loopDelay = (options.hasOwnProperty('loop_delay') ? options.loop_delay : 0);
@@ -1032,8 +1090,22 @@
                 playing = true;
                 step();
             };
-            var play_for_duration = function(duration, overrideFrameDuration) {
+            // Randomly trigger an eyebrow raise at some point during speech.
+            var trigger_eyebrow_anim = function(duration){
+                // if eyebrow channel exists
+                if ('1' in talkr_channels){
+                    if( Math.random() > 0.65 ) {
+                        var eyebrows = talkr_channels['1'];
+                        if( eyebrows && eyebrows.controller){
+                            setTimeout( eyebrows.controller.play, Math.random() * duration);
+                        }
+                    }
+                }
+
+            }            
+            var play_for_duration = function(duration, overrideFrameDuration, bPlayEyebrowAnim) {
                 if (overrideFrameDuration) {
+                    console.log("overriding frame duration: " + overrideFrameDuration)
                     overrideFrameTime = overrideFrameDuration
                 } else {
                     overrideFrameTime = null;
@@ -1042,6 +1114,9 @@
                     overrideFrameTime = 125;
                     // snapping the mouth open and close looks bad.
                     duration = 300;
+                }
+                if( bPlayEyebrowAnim ){
+                    trigger_eyebrow_anim(duration)
                 }
                 pingpong = true;
                 playing = true;
@@ -1074,8 +1149,8 @@
                 step: step,
                 play: play,
                 pause: pause,
-                play_for_duration: function(duration, overrideFrameDuration) {
-                    play_for_duration(duration, overrideFrameDuration);
+                play_for_duration: function(duration, overrideFrameDuration, bPlayEyebrowAnim) {
+                    play_for_duration(duration, overrideFrameDuration, bPlayEyebrowAnim);
                 },                 
                 playing: playing,
                 move_relative: stepFrame,
@@ -1123,6 +1198,8 @@
                             last_lipsync_frame = block.frameIndex;
                         }
                     }
+
+
                 })
             },
             img: withProgress(doImg, true),
@@ -1157,17 +1234,24 @@
             if(talkr_channels[blink_key]){
                 var numframes = talkr_channels[blink_key].numframes;
                 var startframe = talkr_channels[blink_key].index;
-
-                talkr_channels[blink_key].controller  = new gestureController(startframe, numframes, function(index){
-                    if(!index || index < 0){
-                        blinkCanvas.getContext("2d").clearRect(0,0,eyebrowCanvas.width, eyebrowCanvas.height);
-                    } else {
-                        if( index < frameOffsets.length && index < frames.length ){
-                            var offset = frameOffsets[index];
-                            blinkCanvas.getContext("2d").putImageData(frames[index].data, offset.x, offset.y);
+                if( startframe + numframes < frames.length ){
+                    talkr_channels[blink_key].controller  = new gestureController(startframe, numframes, function(index){
+                        if(!index || index < 0){
+                            blinkCanvas.getContext("2d").clearRect(0,0,eyebrowCanvas.width, eyebrowCanvas.height);
+                        } else {
+                            if( index < frameOffsets.length && index < frames.length ){
+                                var offset = frameOffsets[index];
+                                blinkCanvas.getContext("2d").putImageData(frames[index].data, offset.x, offset.y);
+                            }
                         }
-                    }
-                });
+                    });
+                }
+                if( autoplay_blinks ){
+                    // Create a default looping blink animation with 50ms frame time, looping every 3-8 seconds
+                    talkr_channels[blink_key].controller.construct_default_anim(50, 3000, 8000); 
+
+                    talkr_channels[blink_key].controller.play()
+                } 
             }
 
             if(talkr_channels[eyebrow_key]){
@@ -1183,6 +1267,24 @@
                         }
                     }
                 });
+                if( startframe + numframes < frames.length ){
+                    // create a default eyebrow anim (if we have at least 4-frames)
+                    // This will play randomly on each call to play_for_duration.
+                    if(numframes>=4){
+                        var custom_eyebrow_anim = [
+                            [startframe, 100],
+                            [startframe+1, 100],
+                            [startframe+2, 150],
+                            [startframe+3, 400],
+                            [startframe+2, 150],
+                            [startframe+1, 100],
+                            [startframe, 100],
+                            [-1, 0]
+                        ];
+                        talkr_channels[eyebrow_key].controller.anim = custom_eyebrow_anim
+                        talkr_channels[eyebrow_key].controller.update_default_anim(custom_eyebrow_anim, null, null);
+                    }
+                }
             }         
         }
         var init = function () {
@@ -1251,8 +1353,11 @@
 
         return {
             // play controls
-            play_for_duration: function(duration, overrideFrameDuration) {
-                player.play_for_duration(duration, overrideFrameDuration);
+            play_for_duration: function(duration, overrideFrameDuration, bPlayEyebrowAnim) {
+                if(bPlayEyebrowAnim==null){
+                    bPlayEyebrowAnim = true;
+                }
+                player.play_for_duration(duration, overrideFrameDuration, bPlayEyebrowAnim);
             },            
             play: player.play,
             pause: player.pause,
