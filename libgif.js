@@ -11,6 +11,8 @@
             to speed up or slow down the animation.  Pass NULL to get a frame time derived from the GIF file frame
             delays. bPlayEyebrowAnim defaults to true and specifies that a random eyebrow animation may accompany 
             speech.
+        destroy() - call destroy when you are finished using the SuperGif object to free up memory involved with 
+            looping animations.  Deleting the HTML element or a parent will not free up the memory by itself!            
         get_talkr_ext(channel_identifier) - Provides an interface for controling blink & eyebrow animation channels 
             on GIF files with the talkr extension (exported with talkrapp.com). channel_identifier is '0' for blinks, 
             '1' for eyebrows.  By default a looping blink animation is created and started on SuperGif.load() if a 
@@ -1287,6 +1289,21 @@
                 }
             }         
         }
+        var destroy = function() {
+            if(player){
+                player.pause();
+            }
+            for (var key in talkr_channels) {
+                if(talkr_channels[key] && talkr_channels[key].controller){
+                    talkr_channels[key].controller.pause();
+                }
+            }
+
+            // We won't delete all of the data in the supergif object, but frames is the big one.
+            frames = [];
+            // lastImg has pixel data too and is sizable.
+            lastImg = null;
+        }
         var init = function () {
             var parent = gif.parentNode;
 
@@ -1364,6 +1381,7 @@
             move_relative: player.move_relative,
             move_to: player.move_to,
 
+            destroy      : function() { destroy() },
             // getters for instance vars
             get_playing      : function() { return playing },
             get_canvas       : function() { return canvas },
