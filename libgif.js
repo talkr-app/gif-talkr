@@ -865,11 +865,32 @@
 
         var pushFrame = function () {
             if (!frame) return;
+            // originally, topPos, leftPos were set to 0, and width, wight set from hdr.width, hdr.height. 
+            // So every frame in frames was the size of the whole image.
+            
+            var topPos = 0;
+            var leftPos = 0;
+            var width = hdr.width;
+            var height = hdr.height;      
+
+            // todo: is lastImg the best way to get the dimensions of the frame? 
+            if(lastImg){
+                // We can save 75%-85% memory of a typical talkr file by only storing non-transparent 
+                // portions of each frame.  This assumes that the gif frame has optimal settings for topPos, 
+                // leftPos, width & height.  Given the memory savings, and the fact that there was existing 
+                // support for frameOffsets, I'm not sure why frameOffsets were always set to 0 in
+                // https://github.com/buzzfeed/libgif-js
+                topPos = lastImg.topPos;
+                leftPos = lastImg.leftPos;
+                width = lastImg.width;
+                height = lastImg.height;
+            }
+
             frames.push({
-                            data: frame.getImageData(0, 0, hdr.width, hdr.height),
+                            data: frame.getImageData(leftPos, topPos, width, height),
                             delay: delay
                         });
-            frameOffsets.push({ x: 0, y: 0 });
+            frameOffsets.push({ x: leftPos, y: topPos });
 
             var delayTime = delay == 0 ? defaultFrameTime : delay;
             // Count the total animation time for all lip-sync frames
@@ -1080,6 +1101,14 @@
                 }
 
                 offset = frameOffsets[i];
+                
+                if(frames[i].data.width != tmpCanvas.width || frames[i].data.height != tmpCanvas.height ){
+                    // To save memory, only non-transparent pixels are stored in the frames array.
+                    // On talkr files, this can reduce memory requirements by 80%.  Because
+                    // each frame only writes it's data on the canvas, stale data can potencially 
+                    // stick around unless we clear it.  Copying frame 0 to the canvas is how we are clearing
+                    tmpCanvas.getContext("2d").putImageData(frames[0].data, 0, 0);
+                }
 
                 tmpCanvas.getContext("2d").putImageData(frames[i].data, offset.x, offset.y);
                 ctx.globalCompositeOperation = "copy";
@@ -1238,13 +1267,10 @@
                 var startframe = talkr_channels[blink_key].index;
                 if( startframe + numframes < frames.length ){
                     talkr_channels[blink_key].controller  = new gestureController(startframe, numframes, function(index){
-                        if(!index || index < 0){
-                            blinkCanvas.getContext("2d").clearRect(0,0,eyebrowCanvas.width, eyebrowCanvas.height);
-                        } else {
-                            if( index < frameOffsets.length && index < frames.length ){
-                                var offset = frameOffsets[index];
-                                blinkCanvas.getContext("2d").putImageData(frames[index].data, offset.x, offset.y);
-                            }
+                        blinkCanvas.getContext("2d").clearRect(0,0,eyebrowCanvas.width, eyebrowCanvas.height);
+                        if( index && index >= 0 && index < frameOffsets.length && index < frames.length ){
+                            var offset = frameOffsets[index];
+                            blinkCanvas.getContext("2d").putImageData(frames[index].data, offset.x, offset.y);
                         }
                     });
                 }
@@ -1260,13 +1286,10 @@
                 var numframes = talkr_channels[eyebrow_key].numframes;
                 var startframe = talkr_channels[eyebrow_key].index;                
                 talkr_channels[eyebrow_key].controller = new gestureController(startframe, numframes, function(index){
-                    if(!index || index < 0){
-                        eyebrowCanvas.getContext("2d").clearRect(0,0,eyebrowCanvas.width, eyebrowCanvas.height);
-                    } else {
-                        if( index < frameOffsets.length && index < frames.length ){
-                            var offset = frameOffsets[index];
-                            eyebrowCanvas.getContext("2d").putImageData(frames[index].data, offset.x, offset.y);
-                        }
+                    eyebrowCanvas.getContext("2d").clearRect(0,0,eyebrowCanvas.width, eyebrowCanvas.height);
+                    if( index && index >= 0 && index < frameOffsets.length && index < frames.length ){
+                        var offset = frameOffsets[index];
+                        eyebrowCanvas.getContext("2d").putImageData(frames[index].data, offset.x, offset.y);
                     }
                 });
                 if( startframe + numframes < frames.length ){
