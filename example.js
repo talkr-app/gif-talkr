@@ -88,6 +88,14 @@ function loadNewGif(){
             imgElement.setAttribute('rel:auto_play', 0);
             imagecontainer.appendChild(imgElement);
             instructions.innerHTML = "Please wait..."
+
+            if(sup1){
+                // free memory from previous SuperGif class.  The looping animation would
+                // prevent the frames array from being garbage collected otherwise and memory
+                // use would grow.
+                sup1.destroy()
+            }
+            
             sup1 = new SuperGif({ gif: imgElement });
             sup1.load(function(){
             	instructions.innerHTML = "Click on the image below to hear the message."
