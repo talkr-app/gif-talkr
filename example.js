@@ -106,19 +106,18 @@ function loadNewGif(){
 }
 if(gifurlinput)gifurlinput.addEventListener('input', loadNewGif) 
 
-var imgurgifs = ["https://i.imgur.com/nIYJ3hf.gif", // lily
-    "https://i.imgur.com/GTlEMHn.gif", // dog2
-    "https://i.imgur.com/S740Je4.gif", // brunette
-    "https://i.imgur.com/LfxwrCM.gif", // trump
-    "https://i.imgur.com/JhrwKQb.gif", // bear
-    "https://i.imgur.com/sgE5CCo.gif", //guerilla
-    "https://i.imgur.com/DWKjljE.gif", // washington     
-    "https://i.imgur.com/kIrODoK.gif", // kiera
-    "https://i.imgur.com/3LgL03O.gif", // dog1                   
-    "https://i.imgur.com/YH5W9pN.gif", //taylor
-    "https://i.imgur.com/Evu5uVy.gif", // beiber
-    "https://i.imgur.com/GXkh6d4.gif", // portman
-    "https://i.imgur.com/bRNJlO9.gif", // white walker
+var imgurgifs = [
+
+    "https://i.imgur.com/lLHEQ3F.gif", // mona
+    "https://i.imgur.com/ork8hoP.gif", // lily
+    "https://i.imgur.com/dS2yZ19.gif", // dog2
+    "https://i.imgur.com/YpKsOQS.gif", // trump
+    "https://i.imgur.com/FkEVxI6.gif", // washington
+    "https://i.imgur.com/dvXw5bu.gif", // brunette
+    "https://i.imgur.com/RLMkj1P.gif", // kiera
+    "https://i.imgur.com/JwAmmkx.gif", // dog1 
+    "https://i.imgur.com/vqVsazA.gif", // beiber
+    "https://i.imgur.com/YphP1gi.gif" // portman
 ]
 var imgurgifindex = 0;
 var newgifbutton = document.getElementById("newgifbutton");
