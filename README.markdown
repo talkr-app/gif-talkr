@@ -36,7 +36,7 @@ A new GIF app extension was created to specify animation channels that could be 
 ## Eyebrows and Blinks
 The app extension is used to determine which frames (if any) should be used to create eyebrow and blink animations.  These are not looped as part of the normal animation, and instead are layered on top at random intervals.  This can bring movement to the upper part of the face with out making the gif overly repetitive or predictable.
 
-A future version of the iOS app Talkr (www.talkrapp.com) will support outputing .GIF files with this extension, but for now a selection of examples is available from [imgur](http://imgur.com/a/NRZVQ) .  You can find some regular gif files without the TALKRAPP extension [here](http://imgur.com/a/qgptp).
+The Premium version ($2.99) of the iOS app Talkr (www.talkrapp.com) supports outputing .GIF files with this extension, but a selection of examples is available from [imgur](http://imgur.com/a/NRZVQ) .  You can find some regular gif files without the TALKRAPP extension [here](http://imgur.com/a/qgptp).
 
 ## Extension Definition
 ```
@@ -101,9 +101,14 @@ Please note: this example must be loaded via a webserver, not directly from disk
 
 For a hosted example, check out this post on [talkrapp.com](http://www.talkrapp.com/gifdemo/example.html)
 
+
 # Technical Details
 
 Of note to the developer, libjs.gif contains a class SuperGif, which can be used to manipulate animated gifs. For more information on how to use the SuperGif class, check out the original [libgif project](https://github.com/buzzfeed/libgif-js).
+
+# Performance
+
+Prior to playing, the frames of the GIF file must be extracted and stored in memory.  This can take several seconds on a slow device and consume around 10 MB of memory for GIF files exported from talkr which have a width of 480 pixels.  Non-talkr GIF files may consume significantly more memory depending on the number of frames and pixels, and the cropping of the frames (talkr GIF files are optimized and aggressivly cropped to keep memory use low).  In a real-world implementation, you will want to pre-load your GIF file before it talks, and avoid storing too many GIF files in memory simultaneously.  You **must** call the destroy method on the SuperGif object to free the memory when you are finished.
 
 ## Caveat: same-domain origin
 
