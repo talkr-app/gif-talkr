@@ -1072,7 +1072,7 @@
                 }
 
                 if (i >= num_lip_frames) {
-                    i = num_lip_frames - 1; // we'll play the last frame twice, but -2 could be more than frame.length
+                    i = num_lip_frames > 2 ? num_lip_frames - 2 : num_lip_frames - 1;
                     forward = false;
                 } else if (i == 0) {
                     forward = true;
