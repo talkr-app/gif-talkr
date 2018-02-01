@@ -4,7 +4,7 @@
     "name": "talkr",
     "url": "https://talkrapp.com"
   },
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description":"Turn gif files into talking avatars for use with TTS or audio.",
   "homepage":"https://github.com/talkr-app/gif-talkr",
   "bugs":"https://github.com/talkr-app/gif-talkr/issues",
