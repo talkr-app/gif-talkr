@@ -138,7 +138,7 @@ if(newgifbutton){
 // play the specified text 
 function playsyncronized(){
 
-
+	window.speechSynthesis.cancel();
 	if(!'speechSynthesis' in window){
 		instructions.innerHTML = "Speech synthesis is not supported in this browser.  Sorry.";
 		document.getElementById('ttsoptions').style.visibility = "hidden";
