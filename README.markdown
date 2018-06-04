@@ -1,3 +1,6 @@
+
+**Note: This project has been deprecated.  Please check out [talkr-apng](https://github.com/talkr-app/talkr-apng) for a far superior method to make things talk on the web.  Loading times and memory usage are improved dramatically, the implementation uses only a single canvas, and PNG files fully support transpacency.**
+
 # Overview
 
 Forked from the excelent [libgif-js project](https://github.com/buzzfeed/libgif-js), which is a general-purpose gif parsing and playback framework. 
