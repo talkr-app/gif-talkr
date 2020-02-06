@@ -1,5 +1,5 @@
 
-**Note: This project has been deprecated.  Please check out [Talkr Choices](https://choices.talkrapp.com) for an example of a superior method, which converts GIF to APNG files (see [talkr-apng](https://github.com/talkr-app/talkr-apng)) Loading times and memory usage are improved dramatically with APNG, the implementation uses only a single canvas, and PNG files fully support transpacency.**
+**Note: This project has been deprecated.  Please check out [talkr-apng](https://github.com/talkr-app/talkr-apng) instead for a superior method. Loading times and memory usage are improved dramatically with APNG, the implementation uses only a single canvas, and PNG files fully support transpacency.**
 
 # Overview
 
